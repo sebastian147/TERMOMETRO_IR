@@ -1,0 +1,6 @@
+/Debug
+.launch
+.metadata/*
+*/.cproject
+.mcuxpressoide_packages_support
+*/.project
