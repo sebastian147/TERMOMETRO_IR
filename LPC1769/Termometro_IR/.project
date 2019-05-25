@@ -3,6 +3,7 @@
 	<name>Termometro_IR</name>
 	<comment></comment>
 	<projects>
+		<project>lpc_chip_175x_6x</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
