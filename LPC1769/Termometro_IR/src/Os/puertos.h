@@ -16,7 +16,7 @@
 
 
 // ------ Public constants -----------------------------------------
-
+#define TIM_PRESCALE_USVAL	(100)
 // Allows Active Low or Active High led to be used (or other wiring variations)
 #define LED_ON	(true)
 #define LED_OFF (false)
@@ -93,6 +93,14 @@
 // Connected to "SW4" on LPCXpresso baseboard
 // Port 1, Pin 31
 
+// Add jumper wire on baseboard to control WDT
+// WDT is enabled *only* if jumper is in place.
+// (Jumper is read at init phase only)
+// Port 2, Pin 3 => Connected to "SW2 UP" on LPCXpresso baseboard
+#define WDT_JUMPER_PORT (2)
+#define WDT_JUMPER_PIN (3)
+#define WDT_JUMPER_PIN_MODE (IOCON_MODE_PULLUP)
+#define WDT_JUMPER_PIN_FUNC (IOCON_FUNC0)
 
 // ------ Public data type -----------------------------------------
 

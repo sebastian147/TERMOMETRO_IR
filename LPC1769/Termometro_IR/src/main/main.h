@@ -23,6 +23,9 @@
 //! Port header
 #include "../Os/puertos.h"
 
+// Monittor header
+#include "../Os/monittor_lp1769.h"
+
 
 //! ------ Public constants -----------------------------------------
 

@@ -45,8 +45,9 @@
 #define RETURN_FAULT 1
 
 
-//! Two possible system modes
-typedef enum {FAIL_SILENT, NORMAL} eSystem_mode;
+// Three possible system modes
+typedef enum {FAIL_SILENT, NORMAL, FAULT_TASK_TIMING} eSystem_mode;
+
 
 
 //! ------ Public data type -----------------------------------------

@@ -36,6 +36,8 @@ static volatile uint32_t Tick_count_G = 0;
 
 static volatile uint32_t ITask;
 
+// ------ Private constant definitions -----------------------------
+#define	ALLOWED_TIMING_VARIATION_us (20)
 
 //! ------ Private function prototypes ------------------------------
 static void SCH_Go_To_Sleep(void);
@@ -90,6 +92,9 @@ void SCH_Init(const uint32_t TICKms)
     //! we need to disable SysTick timer and SysTick interrupt until
     //! all tasks have been added to the schedule.
     SysTick->CTRL &= 0xFFFFFFFC;
+
+    // Inicialize Data Watchpoint and Trace System Clock Counter
+    DWT_Init();
 }
 
 /**
@@ -134,6 +139,8 @@ void SCH_Dispatch_Tasks(void)
 {
     uint32_t Index;
     uint32_t Update_required = 0;
+    uint32_t time_SCH;
+
 
     __disable_irq(); //! Protect shared resource (Tick_count_G)
     if (Tick_count_G > 0)
@@ -145,25 +152,48 @@ void SCH_Dispatch_Tasks(void)
 
     while (Update_required)
     {
-        //! Go for the 1st task of the task array
-    	for(Index = 0; Index < SCH_MAX_TASKS; ++Index)
-    	{
-			// !Check if there is a task at this location
-			if (SCH_tasks_G[Index].pTask)
-			{
-				SCH_tasks_G[Index].Delay--;
-				if(0 == SCH_tasks_G[Index].Delay)
-				{
-					ITask = Index;
+        // Go through the task array
+        for (Index = 0; Index < SCH_MAX_TASKS; Index++)
+            {
+            // Check if there is a task at this location
+            if (SCH_tasks_G[Index].pTask)
+                {
+                if (--SCH_tasks_G[Index].Delay == 0)
+                    {
+            			// Start of Task Dispatch Time Measurement
+            			DWT_Clear();
 
-					(*SCH_tasks_G[Index].pTask)(); //! Run the task
+            			ITask = Index;
+                		SCH_tasks_G[Index].Debug.State = 0;
 
-					//! All tasks are periodic in this design
-					//! - schedule task to run again
-					SCH_tasks_G[Index].Delay = SCH_tasks_G[Index].Period;
-				}
-			}
-        }
+						MONITTOR_I_Start(	(uint32_t)SCH_tasks_G[Index].pTask,
+											SCH_tasks_G[Index].WCET,
+											SCH_tasks_G[Index].BCET,
+											ALLOWED_TIMING_VARIATION_us);
+
+						(*SCH_tasks_G[Index].pTask)(); // Run the task
+
+						// All tasks are periodic in this design
+						// - schedule task to run again
+
+						SCH_tasks_G[Index].Debug.LET = MONITTOR_I_Stop();
+
+						if(SCH_tasks_G[Index].Debug.LET < SCH_tasks_G[Index].BCET)
+							SCH_tasks_G[Index].Debug.BCET = SCH_tasks_G[Index].Debug.LET;
+						if(SCH_tasks_G[Index].Debug.LET > SCH_tasks_G[Index].WCET)
+							SCH_tasks_G[Index].Debug.WCET = SCH_tasks_G[Index].Debug.LET;
+
+						SCH_tasks_G[Index].Debug.State |= SCH_DEBUG_TASK_RUN_OK;
+						SCH_tasks_G[Index].Debug.RunTimes++;
+
+						SCH_tasks_G[Index].Delay = SCH_tasks_G[Index].Period;
+
+                		// Stop of Task Dispatch Time Measurement
+						time_SCH = DWT_GetTime()/1000 - SCH_tasks_G[Index].Debug.LET;
+                    }
+                }
+            }
+
 
         __disable_irq(); //! Protect shared resource (Tick_count_G)
         if (Tick_count_G > 0)
@@ -180,6 +210,7 @@ void SCH_Dispatch_Tasks(void)
 
 	if(SYSTEM_Get_Mode() == FAIL_SILENT)
 	{
+		MONITTOR_I_Disable();
 		SYSTEM_Perform_Safe_Shutdown();
 	}
 
@@ -204,26 +235,54 @@ uint32_t SCH_Add_Task(void (* pTask)(),
                       const uint32_t BCET
                       )
 {
-    static uint32_t Index = 0;
-    if (Index < SCH_MAX_TASKS)
-    {
-    	if(0 != PERIOD)
-    	{
-        	SCH_tasks_G[Index].pTask = pTask;
+    uint32_t Return_value = 0;
+    uint32_t Index = 0;
 
-        	SCH_tasks_G[Index].Delay = DELAY + 1;
-        	SCH_tasks_G[Index].Period = PERIOD;
-        	SCH_tasks_G[Index].WCET = WCET;
-        	SCH_tasks_G[Index].BCET = BCET;
-        	Index++;
-    	}
+    // First find a gap in the array (if there is one)
+    while ((SCH_tasks_G[Index].pTask != 0) && (Index < SCH_MAX_TASKS))
+        {
+        Index++;
+    }
 
-    }
-    else
-    {
-    	Index = SCH_MAX_TASKS;
-    }
-    return Index;
+    // Have we reached the end of the list?
+    if (Index == SCH_MAX_TASKS)
+        {
+        // Task list is full
+        //
+        // Set the global fault variable
+        Fault_code_G = FAULT_SCH_TOO_MANY_TASKS;
+
+        // Also return a fault code
+        Return_value = SCH_MAX_TASKS;
+        }
+
+    // Check for "one shot" tasks
+    // - not permitted in this design
+    if (PERIOD == 0)
+        {
+        // Set the global fault variable
+        Fault_code_G = FAULT_SCH_ONE_SHOT_TASK;
+
+        // Also return a fault code
+        Return_value = SCH_MAX_TASKS;
+        }
+
+    if (Return_value != SCH_MAX_TASKS)
+        {
+
+        // If we're here, there is a space in the task array
+        // and the task to be added is periodic
+        SCH_tasks_G[Index].pTask = pTask;
+
+        SCH_tasks_G[Index].Delay = DELAY + 1;
+        SCH_tasks_G[Index].Period = PERIOD;
+        SCH_tasks_G[Index].WCET = WCET;
+        SCH_tasks_G[Index].BCET = BCET;
+
+        Return_value = Index;
+        }
+
+    return Return_value;
 }
 #endif
 

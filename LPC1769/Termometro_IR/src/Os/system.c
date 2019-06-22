@@ -15,6 +15,9 @@
 
 
 //! Task headers
+#include "../tasks/task-watchdog_lpc1769.h"
+
+
 //! aqui deberia incluir los headers de las funciones
 
 
@@ -49,8 +52,25 @@ void SYSTEM_Init(void)
  */
 void SYSTEM_Identify_Required_Mode(void)
 {
-	// Set system mode (Normal)
-	System_mode_G = NORMAL;
+	// If "1", reset was caused by WDT
+    uint32_t WDT_flag = (LPC_SYSCTL->RSID >> 2) & 1;
+
+    if (WDT_flag == 1)
+    {
+        // Cleared only by software or POR
+        // Clear flag (or other resets may be interpreted as WDT)
+        //LPC_SYSCTL->RSID &= ~(0x04);
+        LPC_SYSCTL->RSID |= (0x04);//de verdad se escribe el 0 con 1 no con 0
+
+        // Set system mode (Fail Silent)
+        System_mode_G = FAIL_SILENT;
+    }
+    else
+    {
+        // Here we treat all other forms of reset in the same way
+        // Set system mode (Normal)
+        System_mode_G = NORMAL;
+    }
 }
 
 /**
@@ -92,7 +112,9 @@ void SYSTEM_Configure_Required_Mode(void)
             /** Initialize WWDT and event router */
         	Chip_WWDT_Init(LPC_WWDT);
 
- //aca se inizializan las tareas
+        	//aca se inizializan las tareas
+            // Set up WDT (timeout in *microseconds*)
+            WATCHDOG_Init(WatchDog_RateuS);
 
         	// Add tasks to schedule.
             // Parameters are:
@@ -102,6 +124,8 @@ void SYSTEM_Configure_Required_Mode(void)
             // 4. Task WCET (in microseconds)
             // 5. Task BCET (in microseconds)
 
+            // Add watchdog task first
+            SCH_Add_Task(WATCHDOG_Update, 0, 1, 10, 0);
 // Add GPIO_SWITCH task
    // SCH_Add_Task(GPIO_SWITCH_Update, 1, 10, 20, 0);
 

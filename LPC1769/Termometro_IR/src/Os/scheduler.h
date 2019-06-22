@@ -73,6 +73,23 @@ uint32_t SCH_Add_Task(void (* pTask)(),
 
 uint32_t SCH_Get_Current_Task(void);
 sTask* SCH_Get_Current_Task_Pointer(void);
+static INLINE void DWT_Init(void)
+{
+	DWT->CTRL |=DWT_CTRL_CYCCNTENA_Msk;
+	DWT->CYCCNT=0;
+}
+
+
+static INLINE uint32_t DWT_GetTime(void)
+{
+	return (10 * DWT->CYCCNT);		// (10E9 / SystemCoreClock) => nS
+}
+
+
+static INLINE void DWT_Clear(void)
+{
+	DWT->CYCCNT=0;
+}
 
 
 #endif
