@@ -1,0 +1,3 @@
+https://www.espressif.com/sites/default/files/documentation/0a-esp8266ex_datasheet_en.pdf
+
+Consumo de este modulo maximo: 170mA

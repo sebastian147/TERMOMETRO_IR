@@ -1,0 +1,3 @@
+De la pagina 45 a la 55 del manual estan las especificaciones del micro.
+
+Tiene varios modos de funcionamiento, pero como maximo consume 100mA
